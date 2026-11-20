@@ -16,9 +16,11 @@
   .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
   .tabs button { flex: 1; background: #ddd; border: 0; border-radius: 6px; }
   .tabs button.on { background: #1f6f9f; color: #fff; }
-  #msg { color: #b91c1c; font-size: 14px; min-height: 18px; }
+  #msg { font-size: 14px; min-height: 18px; color: #b91c1c; }
+  #msg.ok { color: #15803d; }
   #weather, #regPane { display: none; }
   .g { display: flex; justify-content: center; margin-top: 10px; }
+  .small { font-size: 14px; color: #444; margin: 8px 0 0; }
 </style>
 </head>
 <body>
@@ -38,7 +40,12 @@
   </div>
 
   <div id="regPane">
-    <p>Gmail хаягаараа бүртгүүлнэ</p>
+    <input id="rOvog" placeholder="Овог">
+    <input id="rNer" placeholder="Нэр">
+    <input id="rEmail" type="email" placeholder="Email">
+    <input id="rPass" type="password" placeholder="Нууц үг (6+ тэмдэгт)">
+    <button class="go" onclick="doRegister()">Бүртгүүлэх</button>
+    <p class="small">эсвэл</p>
     <div class="g" id="btnReg"></div>
   </div>
 </div>
@@ -55,13 +62,17 @@ const CLIENT_ID = "641439662458-5ir4gilsco95l8qndhnd80q6t37iijr5.apps.googleuser
 const KEY = "e1e2c76e6d0c393f8b976459a9ac5d79";
 const LAT = 49.30, LON = 106.15;
 const $ = id => document.getElementById(id);
+let gMode = "login";
+
+function setMsg(t, ok) { $("msg").textContent = t; $("msg").className = ok ? "ok" : ""; }
 
 function showTab(w) {
+  gMode = w === "reg" ? "register" : "login";
   $("loginPane").style.display = w === "login" ? "block" : "none";
   $("regPane").style.display = w === "reg" ? "block" : "none";
   $("tabLogin").className = w === "login" ? "on" : "";
   $("tabReg").className = w === "reg" ? "on" : "";
-  $("msg").textContent = "";
+  setMsg("");
 }
 
 async function callApi(data) {
@@ -77,22 +88,35 @@ async function callApi(data) {
   }
 }
 
+async function doRegister() {
+  const email = $("rEmail").value;
+  const d = await callApi({
+    action: "register",
+    ovog: $("rOvog").value, ner: $("rNer").value,
+    email: email, password: $("rPass").value
+  });
+  if (d.ok) {
+    showTab("login");
+    $("lEmail").value = email;
+    setMsg(d.msg, true);
+  } else setMsg(d.msg);
+}
+
 async function doLogin() {
   const d = await callApi({ action: "login", email: $("lEmail").value, password: $("lPass").value });
-  if (d.ok) showWeather(d.name); else $("msg").textContent = d.msg;
+  if (d.ok) showWeather(d.name); else setMsg(d.msg);
 }
 
 async function onGoogle(res) {
-  $("msg").textContent = "Түр хүлээнэ үү...";
-  const d = await callApi({ credential: res.credential });
-  if (d.ok) showWeather(d.name); else $("msg").textContent = d.msg;
+  setMsg("Түр хүлээнэ үү...", true);
+  const d = await callApi({ action: "google", mode: gMode, credential: res.credential });
+  if (d.ok) showWeather(d.name); else setMsg(d.msg);
 }
 
 function showWeather(name) {
   $("userName").textContent = "Сайн уу, " + name;
   $("authBox").style.display = "none";
   $("weather").style.display = "block";
-
   fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${LAT}&lon=${LON}&units=metric&appid=${KEY}`)
     .then(r => r.json())
     .then(d => {
