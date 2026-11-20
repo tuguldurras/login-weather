@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  body { margin: 0; min-height: 100vh; display: flex; justify-content: center;
+         align-items: center; text-align: center; font-family: Arial, sans-serif;
+         font-size: 18px;
+         background: url("https://www.pacificflying.com/wp-content/uploads/Magda-Ehlers-clouds.jpg") center/cover; }
+  .box { border: 3px solid #1f6f9f; border-radius: 16px; padding: 24px 40px;
+         background: rgba(255,255,255,0.85); width: 300px; }
+  input { width: 100%; padding: 10px; margin: 5px 0; box-sizing: border-box; font-size: 16px; }
+  button { padding: 10px 16px; margin: 5px 0; font-size: 16px; cursor: pointer; }
+  .go { width: 100%; background: #1f6f9f; color: #fff; border: 0; border-radius: 6px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .tabs button { flex: 1; background: #ddd; border: 0; border-radius: 6px; }
+  .tabs button.on { background: #1f6f9f; color: #fff; }
+  #msg { color: #b91c1c; font-size: 14px; min-height: 18px; }
+  #weather, #regPane { display: none; }
+  .g { display: flex; justify-content: center; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div class="box" id="authBox">
+  <div class="tabs">
+    <button id="tabLogin" class="on" onclick="showTab('login')">Нэвтрэх</button>
+    <button id="tabReg" onclick="showTab('reg')">Бүртгүүлэх</button>
+  </div>
+  <p id="msg"></p>
+
+  <div id="loginPane">
+    <input id="lEmail" type="email" placeholder="Email">
+    <input id="lPass" type="password" placeholder="Нууц үг">
+    <button class="go" onclick="doLogin()">Нэвтрэх</button>
+    <div class="g" id="btnLogin"></div>
+  </div>
+
+  <div id="regPane">
+    <p>Gmail хаягаараа бүртгүүлнэ</p>
+    <div class="g" id="btnReg"></div>
+  </div>
+</div>
+
+<div class="box" id="weather">
+  <p id="userName"></p>
+  <h2>Дархан</h2>
+  <p id="out">Ачаалж байна...</p>
+  <button onclick="location.reload()">Гарах</button>
+</div>
+
+<script>
+const CLIENT_ID = "641439662458-5ir4gilsco95l8qndhnd80q6t37iijr5.apps.googleusercontent.com";
+const KEY = "e1e2c76e6d0c393f8b976459a9ac5d79";
+const LAT = 49.30, LON = 106.15;
+const $ = id => document.getElementById(id);
+
+function showTab(w) {
+  $("loginPane").style.display = w === "login" ? "block" : "none";
+  $("regPane").style.display = w === "reg" ? "block" : "none";
+  $("tabLogin").className = w === "login" ? "on" : "";
+  $("tabReg").className = w === "reg" ? "on" : "";
+  $("msg").textContent = "";
+}
+
+async function callApi(data) {
+  try {
+    const r = await fetch("api.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+    return await r.json();
+  } catch (e) {
+    return { ok: false, msg: "Серверт холбогдож чадсангүй." };
+  }
+}
+
+async function doLogin() {
+  const d = await callApi({ action: "login", email: $("lEmail").value, password: $("lPass").value });
+  if (d.ok) showWeather(d.name); else $("msg").textContent = d.msg;
+}
+
+async function onGoogle(res) {
+  $("msg").textContent = "Түр хүлээнэ үү...";
+  const d = await callApi({ credential: res.credential });
+  if (d.ok) showWeather(d.name); else $("msg").textContent = d.msg;
+}
+
+function showWeather(name) {
+  $("userName").textContent = "Сайн уу, " + name;
+  $("authBox").style.display = "none";
+  $("weather").style.display = "block";
+
+  fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${LAT}&lon=${LON}&units=metric&appid=${KEY}`)
+    .then(r => r.json())
+    .then(d => {
+      $("out").innerHTML = `Температур: ${d.main.temp.toFixed(2)}°C<br>
+                            Чийгшил: ${d.main.humidity}%<br>
+                            Салхи: ${d.wind.speed.toFixed(2)} м/с`;
+    });
+}
+
+window.onload = () => {
+  google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onGoogle });
+  google.accounts.id.renderButton($("btnLogin"), { theme: "outline", size: "large", text: "signin_with" });
+  google.accounts.id.renderButton($("btnReg"), { theme: "outline", size: "large", text: "signup_with" });
+};
+</script>
+</body>
+</html>
